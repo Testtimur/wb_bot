@@ -13,6 +13,28 @@ from telegram.ext import (
 )
 import json
 import os
+from threading import Thread
+from flask import Flask
+
+# Flask приложение для Render (чтобы порт был открыт)
+app = Flask(__name__)
+
+
+@app.route('/')
+def home():
+    return "🤖 Бот работает! ✅"
+
+
+@app.route('/health')
+def health():
+    return {"status": "ok", "bot": "running"}
+
+
+def run_flask():
+    """Запуск Flask в отдельном потоке"""
+    port = int(os.environ.get('PORT', 10000))
+    app.run(host='0.0.0.0', port=port)
+
 
 # Состояния
 WAITING_FOR_API_KEY = 1
@@ -319,8 +341,26 @@ def main():
     """Запуск бота"""
     load_user_data()
 
-    # ⚠️ ВСТАВЬТЕ ВАШ ТОКЕН БОТА ЗДЕСЬ
-    TOKEN = "8389924474:AAGthpjg_sKQ5qMydMV4F40nTbK1Pxw0Gxs"
+    # Токен из переменных окружения (для Render) или вручную
+    TOKEN = os.getenv('TELEGRAM_BOT_TOKEN') or "YOUR_TELEGRAM_BOT_TOKEN"
+
+    # Автоматическая настройка API ключа WB из переменных окружения
+    wb_api_key = os.getenv('WB_API_KEY')
+    if wb_api_key:
+        # ID 1 используется для автоматического запуска
+        if '1' not in user_data:
+            user_data['1'] = {
+                'api_key': wb_api_key,
+                'known_orders': set(),
+                'monitoring': True
+            }
+            save_user_data()
+            print("✅ API ключ WB загружен из переменных окружения")
+        elif not user_data['1'].get('api_key'):
+            user_data['1']['api_key'] = wb_api_key
+            user_data['1']['monitoring'] = True
+            save_user_data()
+            print("✅ API ключ WB обновлён из переменных окружения")
 
     app = Application.builder().token(TOKEN).build()
 
