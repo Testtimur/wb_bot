@@ -16,16 +16,16 @@ import os
 from threading import Thread
 from flask import Flask
 
-# Flask приложение для Render (чтобы порт был открыт)
-app = Flask(__name__)
+# Flask приложение для Render
+flask_app = Flask(__name__)
 
 
-@app.route('/')
+@flask_app.route('/')
 def home():
     return "🤖 Бот работает! ✅"
 
 
-@app.route('/health')
+@flask_app.route('/health')
 def health():
     return {"status": "ok", "bot": "running"}
 
@@ -33,7 +33,7 @@ def health():
 def run_flask():
     """Запуск Flask в отдельном потоке"""
     port = int(os.environ.get('PORT', 10000))
-    app.run(host='0.0.0.0', port=port)
+    flask_app.run(host='0.0.0.0', port=port)
 
 
 # Состояния
@@ -326,7 +326,7 @@ async def check_orders_job(context: ContextTypes.DEFAULT_TYPE):
                                 text=format_order(order),
                                 parse_mode='HTML'
                             )
-                            await asyncio.sleep(0.5)  # Задержка между сообщениями
+                            await asyncio.sleep(0.5)
                         except Exception as e:
                             print(f"❌ Ошибка отправки сообщения: {e}")
 
@@ -341,13 +341,12 @@ def main():
     """Запуск бота"""
     load_user_data()
 
-    # Токен из переменных окружения (для Render) или вручную
-    TOKEN = os.getenv('TELEGRAM_BOT_TOKEN') or "8389924474:AAGthpjg_sKQ5qMydMV4F40nTbK1Pxw0Gxs"
+    # Токен из переменных окружения
+    TOKEN = os.getenv('TELEGRAM_BOT_TOKEN', "8389924474:AAGthpjg_sKQ5qMydMV4F40nTbK1Pxw0Gxs")
 
-    # Автоматическая настройка API ключа WB из переменных окружения
+    # Автоматическая настройка API ключа WB
     wb_api_key = os.getenv('WB_API_KEY')
     if wb_api_key:
-        # ID 1 используется для автоматического запуска
         if '1' not in user_data:
             user_data['1'] = {
                 'api_key': wb_api_key,
@@ -356,15 +355,11 @@ def main():
             }
             save_user_data()
             print("✅ API ключ WB загружен из переменных окружения")
-        elif not user_data['1'].get('api_key'):
-            user_data['1']['api_key'] = wb_api_key
-            user_data['1']['monitoring'] = True
-            save_user_data()
-            print("✅ API ключ WB обновлён из переменных окружения")
 
-    app = Application.builder().token(TOKEN).build()
+    # Создаем Telegram приложение
+    telegram_app = Application.builder().token(TOKEN).build()
 
-    # Обработчик API ключа
+    # Обработчик настройки API
     conv_handler = ConversationHandler(
         entry_points=[CallbackQueryHandler(button_handler, pattern='^setup_api$')],
         states={
@@ -377,20 +372,26 @@ def main():
     )
 
     # Регистрация обработчиков
-    app.add_handler(CommandHandler('start', start_command))
-    app.add_handler(conv_handler)
-    app.add_handler(CallbackQueryHandler(button_handler))
+    telegram_app.add_handler(CommandHandler('start', start_command))
+    telegram_app.add_handler(conv_handler)
+    telegram_app.add_handler(CallbackQueryHandler(button_handler))
 
-    # Запуск периодической проверки (каждые 10 минут = 600 секунд)
-    job_queue = app.job_queue
+    # Запуск периодической проверки
+    job_queue = telegram_app.job_queue
     if job_queue:
         job_queue.run_repeating(check_orders_job, interval=600, first=10)
         print("✅ Периодическая проверка запущена (каждые 10 минут)")
     else:
-        print("⚠️ Job queue недоступен! Установите: pip install python-telegram-bot[job-queue]")
+        print("⚠️ Job queue недоступен!")
 
+    # Запускаем Flask сервер для Render
+    flask_thread = Thread(target=run_flask, daemon=True)
+    flask_thread.start()
+    print(f"🌐 Flask сервер запущен на порту {os.environ.get('PORT', 10000)}")
+
+    # Запускаем бота
     print("🤖 Бот запущен...")
-    app.run_polling(allowed_updates=Update.ALL_TYPES)
+    telegram_app.run_polling(allowed_updates=Update.ALL_TYPES)
 
 
 if __name__ == '__main__':
