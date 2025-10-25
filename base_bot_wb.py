@@ -342,7 +342,7 @@ def main():
     load_user_data()
 
     # Токен из переменных окружения (для Render) или вручную
-    TOKEN = os.getenv('TELEGRAM_BOT_TOKEN') or "YOUR_TELEGRAM_BOT_TOKEN"
+    TOKEN = os.getenv('TELEGRAM_BOT_TOKEN') or "8389924474:AAGthpjg_sKQ5qMydMV4F40nTbK1Pxw0Gxs"
 
     # Автоматическая настройка API ключа WB из переменных окружения
     wb_api_key = os.getenv('WB_API_KEY')
